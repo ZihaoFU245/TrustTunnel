@@ -5,8 +5,8 @@ use crate::tls_demultiplexer::Protocol;
 use crate::{
     authentication, core, datagram_pipe, downstream, http_codec, http_datagram_codec,
     http_demultiplexer, http_forwarded_stream, http_icmp_codec, http_ping_handler,
-    http_speedtest_handler, http_udp_codec, log_id, log_utils, net_utils, pipe, reverse_proxy,
-    tunnel,
+    http_speedtest_handler, http_udp_codec, log_id, log_utils, net_utils, padding, pipe,
+    reverse_proxy, tunnel,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -205,11 +205,28 @@ impl downstream::PendingRequest for TcpConnection {
 
     fn promote_to_next_state(self: Box<Self>) -> io::Result<Self::NextState> {
         if self.stream.request().request().method == http::Method::CONNECT {
+            let padding_enabled = self
+                .stream
+                .request()
+                .request()
+                .headers
+                .contains_key(padding::HEADER_NAME);
             let (source, sink) = self.stream.split();
-            return Ok((
+            let mut response = http::Response::<()>::default().into_parts().0;
+            if padding_enabled {
+                response
+                    .headers
+                    .insert(padding::HEADER_NAME, padding::response_header());
+            }
+            let pipe = (
                 source.finalize(),
-                sink.send_ok_response(false)?.into_pipe_sink(),
-            ));
+                sink.send_response(response, false)?.into_pipe_sink(),
+            );
+            return Ok(if padding_enabled {
+                padding::wrap(pipe.0, pipe.1)
+            } else {
+                pipe
+            });
         }
 
         http_forwarded_stream::into_forwarded(self.stream)

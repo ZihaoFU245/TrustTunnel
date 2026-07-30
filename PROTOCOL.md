@@ -253,7 +253,43 @@ After successful CONNECT:
 - Standard HTTP/2 or HTTP/3 flow control applies
 - Stream closure indicates connection termination
 
-### 5.4 Connection Closure
+### 5.4 Optional Padding
+
+TCP CONNECT streams MAY negotiate padding to obscure the sizes of their initial
+payload exchanges. Padding is not supported for the `_udp2`, `_icmp`, or
+`_check` pseudo-hosts.
+
+The client opts in by adding a `padding` header to the CONNECT request. Its
+value SHOULD contain 16 to 32 characters whose HPACK or QPACK Huffman
+representation does not compress their length. A capable endpoint adds a
+`padding` header containing 30 to 62 characters to a successful response. The
+first 16 response characters are selected independently from
+``!#$()+<>?@[]^`{}``, and the remaining characters are `~`. Padding is enabled
+only when the header is present in both messages; the header values themselves
+do not carry protocol data.
+
+The client MUST wait for the response before sending a padded payload when the
+endpoint's capability is not already known.
+
+When enabled, each direction independently frames its first eight payload
+records:
+
+```text
++----------------+--------------+----------------------+------------------+
+| Payload Length | Padding Size | Payload              | Zero Padding     |
+| 2 bytes        | 1 byte       | Payload Length bytes | Padding Size bytes |
++----------------+--------------+----------------------+------------------+
+```
+
+The payload length is an unsigned 16-bit integer in network byte order. The
+padding size is selected uniformly from 0 through 255. Payloads larger than
+65,535 bytes are split across records. After eight complete records in one
+direction, all subsequent bytes in that direction are transmitted without
+framing.
+
+Graceful stream-closing HTTP/2 DATA frames are not padded.
+
+### 5.5 Connection Closure
 
 - **Graceful**: Send HTTP/2 `END_STREAM` flag or HTTP/3 `FIN`
 - **Abrupt**: Send HTTP/2 `RST_STREAM` or HTTP/3 `STOP_SENDING`/`RESET_STREAM`

@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- [Feature] Add opt-in `padding` header negotiation and initial payload padding for TCP CONNECT streams.
+
 ### Changed
 
 ### Deprecated

@@ -35,6 +35,7 @@ mod http_udp_codec;
 mod icmp_forwarder;
 mod icmp_utils;
 mod metrics;
+mod padding;
 mod pipe;
 mod quic_multiplexer;
 mod reverse_proxy;
